@@ -1,8 +1,10 @@
-#include "DHTesp.h" // Click here to get the library: http://librarymanager/All#DHTesp
+#include "DHTesp.h"  // Click here to get the library: http://librarymanager/All#DHTesp
 #include <Ticker.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
 #ifndef ESP32
-#pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
+#pragma message(THIS EXAMPLE IS FOR ESP32 ONLY !)
 #error Select ESP32 board.
 #endif
 
@@ -15,7 +17,7 @@
 
 DHTesp dht;
 
-void tempTask(void *pvParameters);
+void tempTask(void* pvParameters);
 bool getTemperature();
 void triggerGetTemp();
 
@@ -30,6 +32,15 @@ bool tasksEnabled = false;
 /** Pin number for DHT11 data pin */
 int dhtPin = 27;
 
+
+// wifi http stuff
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PW";
+const char* serverName = "http://adress:port";
+unsigned long lastTime = 0;
+unsigned long timerDelay = 5000;
+
+
 /**
  * initTemp
  * Setup DHT library
@@ -41,18 +52,18 @@ int dhtPin = 27;
 bool initTemp() {
   byte resultValue = 0;
   // Initialize temperature sensor
-	dht.setup(dhtPin, DHTesp::DHT11);
-	Serial.println("DHT initiated");
+  dht.setup(dhtPin, DHTesp::DHT11);
+  Serial.println("DHT initiated");
 
   // Start task to get temperature
-	xTaskCreatePinnedToCore(
-			tempTask,                       /* Function to implement the task */
-			"tempTask ",                    /* Name of the task */
-			4000,                           /* Stack size in words */
-			NULL,                           /* Task input parameter */
-			5,                              /* Priority of the task */
-			&tempTaskHandle,                /* Task handle. */
-			1);                             /* Core where the task should run */
+  xTaskCreatePinnedToCore(
+    tempTask,        /* Function to implement the task */
+    "tempTask ",     /* Name of the task */
+    4000,            /* Stack size in words */
+    NULL,            /* Task input parameter */
+    5,               /* Priority of the task */
+    &tempTaskHandle, /* Task handle. */
+    1);              /* Core where the task should run */
 
   if (tempTaskHandle == NULL) {
     Serial.println("Failed to start task for temperature update");
@@ -71,7 +82,7 @@ bool initTemp() {
  */
 void triggerGetTemp() {
   if (tempTaskHandle != NULL) {
-	   xTaskResumeFromISR(tempTaskHandle);
+    xTaskResumeFromISR(tempTaskHandle);
   }
 }
 
@@ -80,17 +91,17 @@ void triggerGetTemp() {
  * @param pvParameters
  *    pointer to task parameters
  */
-void tempTask(void *pvParameters) {
-	Serial.println("tempTask loop started");
-	while (1) // tempTask loop
+void tempTask(void* pvParameters) {
+  Serial.println("tempTask loop started");
+  while (1)  // tempTask loop
   {
     if (tasksEnabled) {
       // Get temperature values
-			getTemperature();
-		}
+      getTemperature();
+    }
     // Got sleep again
-		vTaskSuspend(NULL);
-	}
+    vTaskSuspend(NULL);
+  }
 }
 
 /**
@@ -101,31 +112,56 @@ void tempTask(void *pvParameters) {
  *    false if aquisition failed
 */
 bool getTemperature() {
-	// Reading temperature for humidity takes about 250 milliseconds!
-	// Sensor readings may also be up to 2 seconds 'old' (it's a very slow sensor)
+  // Reading temperature for humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (it's a very slow sensor)
   TempAndHumidity newValues = dht.getTempAndHumidity();
-	// Check if any reads failed and exit early (to try again).
-	if (dht.getStatus() != 0) {
-		Serial.println("DHT11 error status: " + String(dht.getStatusString()));
-		return false;
-	}
+  // Check if any reads failed and exit early (to try again).
+  if (dht.getStatus() != 0) {
+    Serial.println("DHT11 error status: " + String(dht.getStatusString()));
+    return false;
+  }
 
-	float heatIndex = dht.computeHeatIndex(newValues.temperature, newValues.humidity);
+  float heatIndex = dht.computeHeatIndex(newValues.temperature, newValues.humidity);
   float dewPoint = dht.computeDewPoint(newValues.temperature, newValues.humidity);
 
-
-  
-
   Serial.println(" T:" + String(newValues.temperature) + " H:" + String(newValues.humidity) + " I:" + String(heatIndex) + " D:" + String(dewPoint));
-	return true;
+
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClient client;
+    HTTPClient http;
+    http.begin(client, serverName);
+    http.addHeader("Content-Type", "application/json");
+    int httpResponseCode = http.POST("{\"Temperatur\":\"" + String(newValues.temperature) + "\",\"Humidity\":\"" + String(newValues.humidity) + "\"}");
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+
+    // Free resources
+    http.end();
+  } else {
+    Serial.println("WiFi Disconnected");
+  }
+
+  return true;
 }
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("DHT ESP32 example with tasks");
   initTemp();
+
+  WiFi.begin(ssid, password);
+  Serial.println("Connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to WiFi network with IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  Serial.println("Timer set to 5 seconds (timerDelay variable), it will take 5 seconds before publishing the first reading.");
+
   // Signal end of setup() to tasks
   tasksEnabled = true;
 }
@@ -137,8 +173,8 @@ void loop() {
     // Enable task that will read values from the DHT sensor
     tasksEnabled = true;
     if (tempTaskHandle != NULL) {
-			vTaskResume(tempTaskHandle);
-		}
+      vTaskResume(tempTaskHandle);
+    }
   }
   yield();
 }
