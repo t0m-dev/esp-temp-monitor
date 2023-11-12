@@ -2,6 +2,7 @@
 #include <Ticker.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include "/home/tom/Dokumente/pws.h"
 
 #ifndef ESP32
 #pragma message(THIS EXAMPLE IS FOR ESP32 ONLY !)
@@ -34,9 +35,9 @@ int dhtPin = 27;
 
 
 // wifi http stuff
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PW";
-const char* serverName = "http://adress:port";
+//const char* ssid = "YOUR_WIFI_SSID";
+//const char* password = "YOUR_WIFI_PW";
+//const char* serverName = "http://adress:port";
 unsigned long lastTime = 0;
 unsigned long timerDelay = 5000;
 
@@ -148,6 +149,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("DHT ESP32 example with tasks");
+
   initTemp();
 
   WiFi.begin(ssid, password);
