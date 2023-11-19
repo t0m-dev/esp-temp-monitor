@@ -18,6 +18,10 @@
 
 DHTesp dht;
 
+// on linux:
+//uuidgen -N test -n @oid --md5
+const char satteliteUUID[] = "61df151d-7508-321d-ada6-27936752b809";
+
 void tempTask(void* pvParameters);
 bool getTemperature();
 void triggerGetTemp();
@@ -132,7 +136,7 @@ bool getTemperature() {
     HTTPClient http;
     http.begin(client, serverName);
     http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST("{\"Temperatur\":\"" + String(newValues.temperature) + "\",\"Humidity\":\"" + String(newValues.humidity) + "\"}");
+    int httpResponseCode = http.POST("{\"uuid\":\""+ String(satteliteUUID)+"\",\"values\":{\"temperature\":\"" + String(newValues.temperature) + "\",\"humidity\":\"" + String(newValues.humidity) + "\"}}");
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
 
